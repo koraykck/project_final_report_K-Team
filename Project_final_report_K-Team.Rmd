@@ -77,7 +77,7 @@ All categories are given in percentage and can be divided into two parts "Safely
 
 Access to data: [UNICEF Website](https://data.unicef.org/topic/water-and-sanitation/covid-19/)
         
-```{r message = FALSE, echo=FALSE}
+```{r message = FALSE}
 # Importing data set from excel table by read_excel method.  
 # Data set has irregular column names so names added manually.
 drinking_water_data <- read_excel("Data\\Drinking_Water.xlsx",
@@ -123,7 +123,7 @@ datatable(water_resource_2017, rownames=FALSE, filter="top", options = list(page
 Data set is from "data.worldbank" contains death rates per 1000 people of countries.
 Access to data: [Worldbank Website](https://data.worldbank.org/indicator/SP.DYN.CDRT.IN)
   
-```{r, message = FALSE, echo=FALSE}
+```{r, message = FALSE}
 mortality_data <- read_excel("Data\\Mortality.xlsx", range="A4:BL270")
 mortality_data <- select(mortality_data,-c(3:54))
 
@@ -134,7 +134,7 @@ datatable(mortality_data, rownames=FALSE, filter="top", options=list(pageLength 
 World Bank national accounts data, and OECD National Accounts data files.
 Access to data: [Worldbank Website](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD)
   
-```{r, message = FALSE, echo=FALSE}
+```{r, message = FALSE}
 GDP_data <- read_excel("Data\\GDP.xlsx", range="A4:BM270")
 GDP_data <- select(GDP_data,-c(3:54))
 
@@ -347,7 +347,7 @@ water_risk_duration <- water_risk_duration[-5,]
 ```
 Estimated duration time of the risk that reported by authorities:
 ```{r, message = FALSE, warning=FALSE, out.width="100%"}
-###
+
 water_risk_duration <- select(water_resource_2018,10)
 colnames(water_risk_duration) <- "duration"
 water_risk_duration <- water_risk_duration %>%
@@ -377,7 +377,7 @@ duration_p
 ```
 The type of risks the water supply faces in 2017 and 2018: 
 ```{r, message=FALSE,warning=FALSE,out.width="100%"}
-###
+
 water_risk_cause_17 <- select(water_resource_2017,9)
 
 colnames(water_risk_cause_17) <- "type"
@@ -395,8 +395,7 @@ map_cause_17 <- ggplot(data=water_risk_cause_17, aes(x=type, y=n, fill=type))+
     theme_classic() + theme(legend.position="none")
 
 map_cause_17
-###
-###
+
 water_risk_cause_18 <- select(water_resource_2018,9)
 colnames(water_risk_cause_18) <- "type"
 water_risk_cause_18 <- water_risk_cause_18 %>%
@@ -416,7 +415,7 @@ map_cause_18 <- ggplot(data=water_risk_cause_18, aes(x=type, y=n, fill=type))+
     theme_classic() + theme(legend.position="none")
 
 map_cause_18
-###
+
 ```
 To see detailed risk description (2018) hover the popups
 ```{r message=FALSE, warning=FALSE, out.width="100%"}
