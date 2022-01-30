@@ -1,0 +1,587 @@
+---
+title: "Clean Water Resources and Facilities"
+author: "Koray Küçük/K-Team"
+date: "Jan 30, 2022"
+output:
+  
+  html_document:
+    code_folding: hide 
+  pdf_document: default
+---
+
+<style type="text/css">
+
+h1.title {
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  text-align: center;
+}
+.leaflet-container {
+    background: #FFF;
+}
+
+</style>
+
+
+# Description
+Analyzing the clean water resources and access of clean water data of the countries and to examine this results in terms of mortality rates and the economic situation of countries.Thus make inferences about the clean water situation in the world.
+
+# Project Goal & Social Problem Addressed
+It is a fact that we face a shortage of natural resources due to the rapid increase in the human population, but the only reason for this cannot be an increasing population and undoubtedly, clean water is the most critical of these natural resource problems for humans.
+
+The absence of clean water causes many important problems, especially on  human health because clean water is used not only for drinking but also for hygiene and sanitation.Furthermore, the lack of sanitation in public areas not only causes diseases and deaths, but also damages the environment. Today, services based on clean water, which are one of the most basic rights of every human being, are not available in many countries or cannot be provided adequately.
+
+When considering the reasons for the problem of access to clean water, the first things that come to mind are global warming and, of course, economic inadequacies. Climate change is disrupting weather patterns, leading to extreme weather events and that can cause unpredictable water availability, exacerbating water scarcity and contaminating water supplies. Also the economic situation of a countries play an important role in the conversion of natural spring water to drinking water and the establishment of facilities.
+
+In the project, clean water, sanitation and hygiene data will be examined and clean water access of the world countries will be compared to each other and the following questions will be examined.
+- What is the clean water sources and status of countries and how does this affect them?
+- Does the economic situation have an impact on access to clean water?
+- how death rates differ in countries without access to clean water?
+
+
+# Project Data & Access to Data
+
+```{r message = FALSE,include=FALSE}
+# Necessary libraries for project.
+# plyr library must be loaded before dplyr for overwriting functions
+library(plyr)
+library(tidyverse)
+library(readxl)
+library(readr)
+library(DT)
+library(reshape)
+library(RColorBrewer)
+library(scales)
+library(sf)
+library(leaflet)
+library(htmlwidgets)
+```
+
+## WASH Data set
+WASH data is a joint program of WHO and UNICEF for Water Supply, Sanitation and hygiene situation of countries.
+From WASH data only drinking water on household level will be used.
+Information about categories:  
+
+- <mark style="background-color: #0288d1">Safely managed</mark>: Improved source accessible on premises, available when needed and free of contamination.
+- <mark style="background-color: #4fc3f7">Basic</mark>: Improved source within 30 minutes round trip collection time.
+- <mark style="background-color: #fff176">Limited</mark>: Improved source over 30 minutes round trip collection time. 
+- <mark style="background-color: #ffd54f">Unimproved</mark>: An unprotected dug well or unprotected spring.
+- <mark style="background-color: #ffb300">Surface water</mark>: Drinking water directly from a river, dam, lake, pond, stream, canal or irrigation canal.
+
+All categories are given in percentage and can be divided into two parts "Safely Managed" and others("Basic","Limited","Unimproved" and
+"Surface Water"). For example if a country have %88 "Safely Managed" ratio this means percentages of other categories contents of %12.
+
+Access to data: [UNICEF Website](https://data.unicef.org/topic/water-and-sanitation/covid-19/)
+        
+```{r message = FALSE, echo=FALSE}
+# Importing data set from excel table by read_excel method.  
+# Data set has irregular column names so names added manually.
+drinking_water_data <- read_excel("Data\\Drinking_Water.xlsx",
+                                  range="A14:I4917",
+                                  col_names = c("Country","ISO3","Year",
+                                                "Population","%Urban",
+                                                "At_Least_Basic","Limited",
+                                                "Unimproved","Surface_Water"),
+                                  na = "-")
+
+safely_managed <- read_excel("Data\\Drinking_Water.xlsx",range="U14:U4917",col_names=FALSE)
+
+# Merge last column to data set.
+drinking_water_data["Safely_Managed"] <- safely_managed
+
+# Interactive data frame, there is a search option for all columns and whole data set can be seen.
+datatable(drinking_water_data, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T) )
+
+```  
+
+## Water Resources data set
+This data sets includes the urban risks to water supply as reported by cities in the 2018 and 2017 CDP Cities questionnaire. In the data set, there is a brief explanation of the risk faced with the water resource of that country given by authorities.
+
+The categories to be examined in the project are:
+
+- Risks to city's water supply: As the name suggests, flooding, prices, bad infrastructure etc. 
+- Risk Description: if the other category is insufficient, there is a short description.
+- Timescale: The estimated time that the risk will remain.
+- Magnitude: Importance of the risk to population.
+
+Access to data: [CDP Data Website](https://data.cdp.net/browse?category=Water)
+
+```{r, message=FALSE}
+# Importing data sets by read_csv methods from csv files
+water_resource_2017 <- read_csv("Data\\2017_Cities_Water_Risks.csv")
+
+water_resource_2018 <- read_csv("Data\\2018_Cities_Water_Risks.csv")
+
+datatable(water_resource_2017, rownames=FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+```
+
+## Death Rates data set
+Data set is from "data.worldbank" contains death rates per 1000 people of countries.
+Access to data: [Worldbank Website](https://data.worldbank.org/indicator/SP.DYN.CDRT.IN)
+  
+```{r, message = FALSE, echo=FALSE}
+mortality_data <- read_excel("Data\\Mortality.xlsx", range="A4:BL270")
+mortality_data <- select(mortality_data,-c(3:54))
+
+datatable(mortality_data, rownames=FALSE, filter="top", options=list(pageLength = 5, scrollX=T))
+```
+  
+## GDP data set
+World Bank national accounts data, and OECD National Accounts data files.
+Access to data: [Worldbank Website](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD)
+  
+```{r, message = FALSE, echo=FALSE}
+GDP_data <- read_excel("Data\\GDP.xlsx", range="A4:BM270")
+GDP_data <- select(GDP_data,-c(3:54))
+
+datatable(GDP_data, rownames=FALSE, filter="top", options=list(pageLength = 5, scrollX=T))
+```  
+  
+# Actions Taken
+
+## WASH Data Set Analysis 
+Average percentage of countries in the world with safe access to water:
+
+```{r message=FALSE, warning=FALSE,out.width="100%"}
+# WASH data set cleaning and visualization.
+
+# Filtering data set because only 2010-2020 data will be examined
+drinking_water_data <- drinking_water_data %>% filter(
+  Year >= 2010)
+
+# All columns have string type values like ">99" and "<1". So those values 
+# will be converted to numeric types.
+drinking_water_data <- drinking_water_data %>%
+                    mutate(At_Least_Basic=str_replace(At_Least_Basic,"<",""))%>%
+                    mutate(At_Least_Basic=str_replace(At_Least_Basic,">",""))%>%
+                    mutate(Limited=str_replace(Limited,"<",""))%>%
+                    mutate(Limited=str_replace(Limited,">",""))%>%
+                    mutate(Unimproved=str_replace(Unimproved,"<",""))%>%
+                    mutate(Unimproved=str_replace(Unimproved,">",""))%>%
+                    mutate(Surface_Water=str_replace(Surface_Water,"<",""))%>%
+                    mutate(Surface_Water=str_replace(Surface_Water,">",""))%>%
+                    mutate(Safely_Managed=str_replace(Safely_Managed,"<",""))%>%
+                    mutate(Safely_Managed=str_replace(Safely_Managed,">",""))
+
+drinking_water_data["At_Least_Basic"] <- sapply(drinking_water_data["At_Least_Basic"],as.numeric)
+drinking_water_data["Limited"] <- sapply(drinking_water_data["Limited"],as.numeric)
+drinking_water_data["Unimproved"] <- sapply(drinking_water_data["Unimproved"],as.numeric)
+drinking_water_data["Surface_Water"] <- sapply(drinking_water_data["Surface_Water"],as.numeric)
+drinking_water_data["Safely_Managed"] <- sapply(drinking_water_data["Safely_Managed"],as.numeric)
+
+# # to find out how many countries are in data
+# drinking_water_data %>%
+#   group_by(Country) %>%
+#   summarize(n = n())
+
+# Select certain columns for bar graph of mean Safely Managed water access
+drinking_water_subdata <- select(drinking_water_data,c("Year","Safely_Managed"))
+drinking_water_subdata <- drinking_water_subdata[order(-drinking_water_subdata$Year),]
+
+# Calculation of mean of Safely managed water usage by yearly for every country.
+# NA values are not included to calculation.
+safely_subdata <- aggregate(x = drinking_water_subdata$Safely_Managed,
+                                 by = list(drinking_water_subdata$Year),
+                                 FUN = mean,
+                                 na.rm=TRUE, na.action=NULL
+                                 )
+colnames(safely_subdata) <- c("Year","Safely_Managed")
+
+p <- ggplot(data=safely_subdata, mapping = aes(x=as.factor(Year), y=Safely_Managed, fill=Safely_Managed)) +
+  geom_bar(stat= "identity") + labs(x = "Year",y="Percentage") + theme_minimal()+ labs(fill="Safely Managed\nWater Access")+
+  geom_text(aes(label=round(Safely_Managed,digits=2)),color="white" ,vjust = 2, size=3)
+
+p
+
+```
+
+Average percentage of countries in the world with no safe access to water in four categories:
+```{r message=FALSE, warning=FALSE,out.width="100%"}
+# Selecting certain variables for plotting.
+drinking_water_subdata2 <- select(drinking_water_data,c("Year","At_Least_Basic","Limited","Unimproved","Surface_Water"))
+
+# Calculating mean percentages.
+nonsafely_subdata <- aggregate(list(drinking_water_subdata2$At_Least_Basic, drinking_water_subdata2$Limited, drinking_water_subdata2$Unimproved, drinking_water_subdata2$Surface_Water),
+                                 by = list(drinking_water_subdata2$Year),
+                                 FUN = mean,
+                                 na.rm=TRUE, na.action=NULL
+                                 )
+colnames(nonsafely_subdata) <- c("Year","At_Least_Basic","Limited","Unimproved","Surface_Water")
+
+# Reshape the data for plotting
+nonsafely_subdata <- melt(nonsafely_subdata, id="Year")
+
+# Finding y coordinates for labeling
+df_sorted<- nonsafely_subdata %>% group_by(Year) %>% arrange(value,variable)
+
+df_cumsum <- ddply(df_sorted, "Year",
+                  transform, label_ypos=cumsum(value))
+
+p2 <- ggplot(data=df_cumsum, aes(x=as.factor(Year), y=value, fill=variable)) +
+        geom_bar(stat="identity") + labs(x="Year",y="Percentage")+
+        theme_minimal() + scale_fill_manual(values = c("#4fc3f7","#ffe00e","#ffb300","#F20039"),
+                                            labels=c("Basic","Limited","Unimproved","Surface Water"))+
+        labs(fill="Access Type") + geom_text(aes(y=label_ypos, label=round(value,digits=2)),size=2.5,
+                                             vjust = 1,color="white")+
+        theme_minimal()
+
+p2
+```
+
+Map of countries that have safe water access in 2020:
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Import shape file of world map
+# Only select necessary columns from shape data.
+world <- st_read("Data/world/TM_WORLD_BORDERS-0.3.shp")
+world <- select(world,c(3,5,12))
+```
+
+```{r message=FALSE, warning=FALSE, out.width="100%"}
+# Filter by 2020 and select only safe access data.
+drinking_map_subdata <- drinking_water_data %>% filter(Year==2020)
+drinking_map_subdata <- select(drinking_map_subdata, c(1,2,10))
+
+
+# Compare world shape data with drinking water data through ISO3 variables.
+# And Delete countries that does not exist in the other data set.
+drinking_map_subdata <- drinking_map_subdata %>% arrange(ISO3)
+drinking_map_subdata <- drinking_map_subdata[-c(18,38,51,193,200),]
+world <- world %>% arrange(ISO3)
+world <- world[-c(5,8,13,14,37,41,55,81,97,105,113,162,174,195,197,226,230),]
+
+# Merge data sets and specify color levels, color palette and labels.
+final <- merge(world,drinking_map_subdata)
+
+final <- final %>% mutate(colorLevel = case_when(Safely_Managed >= 0 & Safely_Managed <= 25 ~ "1",
+                    Safely_Managed > 25 & Safely_Managed <= 50 ~ "2",
+                    Safely_Managed > 50 & Safely_Managed <= 75 ~ "3",
+                    Safely_Managed > 75 & Safely_Managed < 99 ~ "4",
+                    Safely_Managed == 99 ~ "5",
+                    is.na(Safely_Managed) ~ "6"
+                    ))
+
+col_pal <- colorFactor(palette = c("#f26a21","#ffc20e","#ffe670","#1cabe2","#0058ab","#dad9d7"),
+                   domain = final$colorLevel)
+
+my_labels <-  sprintf("<center><strong>%s</strong><br><strong>%s&#37;</strong></center>",
+                      final$Country, round(final$Safely_Managed,2)) %>%
+                      lapply(htmltools::HTML)
+
+map <- final %>%
+          leaflet() %>%
+          addPolygons(color = "white",
+                      fillColor = ~col_pal(colorLevel),
+                      weight = 1,
+                      fillOpacity = 0.85,
+                      label=my_labels,
+                      labelOptions = labelOptions(style = list("color" = "white",
+                                                               "background-color" = "#333333",
+                                                               "border-color" = "#333333",
+                                                               "padding" = "20px"),
+                                                  textsize = "15px",
+                                                  direction = "auto"),
+                      highlight = highlightOptions(weight = 1,
+                                                   fillColor = "#333333",
+                                                   bringToFront = TRUE))
+
+
+map
+
+```
+
+## Water Resources Data Set Analysis
+
+The magnitude of the risks that reported by authorities posed by water resources in 2017 and 2018:
+
+```{r, message = FALSE, warning=FALSE, figures-side, fig.show="hold", out.width="50%"}
+water_risk_2017 <- water_resource_2017 %>%
+      group_by(Magnitude) %>%
+      summarize(n = n())
+water_risk_2017 <- water_risk_2017[c(1:3),]
+colnames(water_risk_2017) <- c("Magnitude","number")
+
+water_risk_2018 <- water_resource_2018 %>%
+      group_by(Magnitude) %>%
+      summarize(n = n())
+water_risk_2018 <- water_risk_2018[c(1:3),]
+colnames(water_risk_2018) <- c("Magnitude","number")
+
+p3 <- ggplot(data=water_risk_2017, aes(x = Magnitude, y = number))+
+                            geom_bar(stat="identity") + aes(x=Magnitude,y=number,fill=Magnitude)+
+                            scale_fill_manual(values = c("#F20039", "#FF853D", "#FFBE3D")) +
+                            labs(title="2017") + ylab("Number of Reports") + geom_text(aes(label=number), vjust=2,size=4)+
+                            theme_classic() + theme(legend.position="none") + xlab("Magnitude of Risk")
+
+p3
+
+p6 <- ggplot(data=water_risk_2018, aes(x = Magnitude, y = number))+
+                            geom_bar(stat="identity") + aes(x=Magnitude,y=number,fill=Magnitude)+
+                            scale_fill_manual(values = c("#F20039", "#FF853D", "#FFBE3D")) +
+                            labs(title="2018") + ylab("Number of Reports") + geom_text(aes(label=number), vjust=2,size=4)+
+                            theme_classic() + theme(legend.position="none") + xlab("Magnitude of Risk")
+
+
+p6
+
+water_risk_cause <- select(water_resource_2018,9)
+
+colnames(water_risk_cause) <- "type"
+water_risk_cause <- water_risk_cause %>%
+  group_by(type) %>%
+  summarize(n = n())
+water_risk_cause <- water_risk_cause[-c(2,5),]
+water_risk_cause[1,2] <- water_risk_cause[1,2] +1
+
+
+water_risk_duration <- select(water_resource_2018,10)
+colnames(water_risk_duration) <- "duration"
+water_risk_duration <- water_risk_duration %>%
+  group_by(duration) %>%
+  summarize(n = n())
+water_risk_duration <- water_risk_duration[-5,]
+
+```
+Estimated duration time of the risk that reported by authorities:
+```{r, message = FALSE, warning=FALSE, out.width="100%"}
+###
+water_risk_duration <- select(water_resource_2018,10)
+colnames(water_risk_duration) <- "duration"
+water_risk_duration <- water_risk_duration %>%
+  group_by(duration) %>%
+  summarize(n = n())
+water_risk_duration <- water_risk_duration[-5,]
+water_risk_duration["Year"] <- "2018"
+
+
+water_risk_duration_17 <- select(water_resource_2017,10)
+colnames(water_risk_duration_17) <- "duration"
+water_risk_duration_17 <- water_risk_duration_17 %>%
+  group_by(duration) %>%
+  summarize(n = n())
+water_risk_duration_17 <- water_risk_duration_17[-5,]
+water_risk_duration_17["Year"] <- "2017"
+
+
+duration_total <- rbind(water_risk_duration_17,water_risk_duration)
+
+duration_p <- ggplot(data=duration_total,aes(x=duration,y=n,fill=Year)) + geom_bar(stat="identity", position=position_dodge()) +
+              xlab("Duration") + ylab("Number of Report")+
+              geom_text(aes(label=n),vjust=1.5,color="white",position = position_dodge(0.9),size=3) + theme_classic()
+
+duration_p
+
+```
+The type of risks the water supply faces in 2017 and 2018: 
+```{r, message=FALSE,warning=FALSE,out.width="100%"}
+###
+water_risk_cause_17 <- select(water_resource_2017,9)
+
+colnames(water_risk_cause_17) <- "type"
+water_risk_cause_17 <- water_risk_cause_17 %>%
+  group_by(type) %>%
+  summarize(n = n())
+
+water_risk_cause_17 <- water_risk_cause_17 %>%
+  mutate(freq = formattable::percent(n / sum(n)))
+
+
+map_cause_17 <- ggplot(data=water_risk_cause_17, aes(x=type, y=n, fill=type))+
+    geom_bar(stat="identity")+geom_text(aes(label=freq),size=2.5)+labs(title="2017")+
+    xlab("") + ylab("Total Number of Risk") +scale_fill_brewer(palette="Set3") + coord_flip()+
+    theme_classic() + theme(legend.position="none")
+
+map_cause_17
+###
+###
+water_risk_cause_18 <- select(water_resource_2018,9)
+colnames(water_risk_cause_18) <- "type"
+water_risk_cause_18 <- water_risk_cause_18 %>%
+  group_by(type) %>%
+  summarize(n = n())
+water_risk_cause_18 <- water_risk_cause_18[-c(2,5),]
+water_risk_cause_18[1,2] <- water_risk_cause_18[1,2] +1
+water_risk_cause_18 <- water_risk_cause_18[-7,]
+
+water_risk_cause_18 <- water_risk_cause_18 %>%
+  mutate(freq = formattable::percent(n / sum(n)))
+
+
+map_cause_18 <- ggplot(data=water_risk_cause_18, aes(x=type, y=n, fill=type))+
+    geom_bar(stat="identity")+geom_text(aes(label=freq),size=2.5)+ labs(title="2018")+
+    xlab("") + ylab("Total Number of Risk") +scale_fill_brewer(palette="Set2") + coord_flip()+
+    theme_classic() + theme(legend.position="none")
+
+map_cause_18
+###
+```
+To see detailed risk description (2018) hover the popups
+```{r message=FALSE, warning=FALSE, out.width="100%"}
+X2018_Cities_Water_Risks <- read_csv("Data/2018_Cities_Water_Risks.csv", 
+    col_types = cols(`Account No` = col_skip(), 
+        Organisation = col_skip(), Access = col_skip(), 
+        C40 = col_skip(), `Reporting year` = col_skip(), 
+        `Current population` = col_skip(), 
+        `Population year` = col_skip()))
+
+
+new_ds <- str_split_fixed(X2018_Cities_Water_Risks$"City Location", ", ", 2)
+
+colnames(new_ds) <- c("lat","lng")
+
+total <- cbind(X2018_Cities_Water_Risks, new_ds)
+
+total$lng <- gsub(")","",total$lng)
+total$lat <- sub('.','',total$lat)
+total["lat"] <- sapply(total["lat"],as.numeric)
+total["lng"] <- sapply(total["lng"],as.numeric)
+names(total)[7] <- "Description"
+
+
+my_label <-  sprintf("<div><strong>%s-%s</strong>: %s</div>",
+                      total$Country,total$City,total$Description) %>%
+                      lapply(htmltools::HTML)
+
+map_2 <- world%>%leaflet()%>%addPolygons(color = "white", 
+                      fillColor = "#6dcf7f", 
+                      weight = 1, 
+                      fillOpacity = 0.85)%>% addMarkers(lng =total$lng , lat=total$lat, label=my_label,
+                                                        labelOptions = labelOptions(style = list(
+                                                          "width"="200px",
+                                                          "color" = "white",
+                                                          "word-break" = "break-all",
+                                                          "padding" = "20px",
+                                                          "background-color" = "#34558a",
+                                                          "white-space" = "normal",
+                                                          "border-color" = "#34558a"
+                                                        )))
+                      
+map_2
+
+```
+
+
+
+## More Analysis
+### List of 10 countries with the most difficult access to clean water:
+```{r,message = FALSE, warning=FALSE}
+drinking_water_data_2020 <- drinking_water_data %>% filter(
+  Year == 2020)
+# Finding
+drinking_water_data_2020 <- select(drinking_water_data_2020,c("Country","Year","Surface_Water","Safely_Managed"))
+surface_water_countries <- drinking_water_data_2020[order(-drinking_water_data_2020$Surface_Water),]
+surface_water_countries <- surface_water_countries[c(1:10),]
+
+datatable(surface_water_countries, rownames=FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+```
+
+### List of 10 country that have the safest access to clean water:
+```{r warning=FALSE, message=FALSE}
+safely_countries <- drinking_water_data_2020[order(-drinking_water_data_2020$Safely_Managed),]
+# safely_countries %>% filter(
+#   Safely_Managed < 99)
+safely_countries <- safely_countries[c(1:10),]
+
+datatable(safely_countries, rownames=FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+
+```
+
+Comparison of GDP values of both countries (safest water usage and insufficient water access) from 2010 to 2020:
+```{r message=FALSE, warning=FALSE, out.width="50%"}
+ind <- c()
+for (var in 1:10) {
+ ind <- c(ind, which(GDP_data == as.character(surface_water_countries[var,"Country"])))
+}
+GDP_surface <- as.data.frame(GDP_data[ind,]) # must be a data frame to avoid errors when plotting
+
+data_surf <- melt(GDP_surface,id=c("Country Name","Country Code"))
+
+colnames(data_surf) <- c("Country_Name","Country_Code","Year","Value")
+data_surf <- select(data_surf,-c(2))
+
+
+# The GDP's(Gross domestic product) of countries that have no safe access to drinking water:
+
+p4 <- ggplot(data=data_surf,aes(x=Year,y=Value,group=Country_Name,color=Country_Name))+
+  geom_line()+scale_y_continuous(labels  =
+                       label_number(scale = 1e-9, prefix = "$", suffix = "b", accuracy = 1))+
+  labs(colour = "Country Name") + ylab("GDP in Billion")+ theme_classic()
+p4
+
+indx <- c()
+for (var in 1:10) {
+ indx <- c(indx, which(GDP_data == as.character(safely_countries[var,"Country"])))
+}
+GDP_safely <- as.data.frame(GDP_data[indx,])
+
+data_safely <- melt(GDP_safely,id=c("Country Name","Country Code"),na.rm=TRUE)
+
+colnames(data_safely) <- c("Country_Name","Country_Code","Year","Value")
+data_safely <- select(data_safely,-c(2))
+
+
+# The GDP's(Gross domestic product) of countries that have completely safe access to drinking water:<br>
+
+
+p5 <- ggplot(data=data_safely,aes(x=Year,y=Value,group=Country_Name,color=Country_Name))+
+  geom_line()+scale_y_continuous(labels  =
+                       label_number(scale = 1e-12, prefix = "$", suffix = "t", accuracy = 1))+
+  labs(colour = "Country Name") + ylab("GDP in Trillion") + theme_classic()
+p5
+```
+
+Comparison of Mortality rates of both countries (safest water usage and insufficient water access) from 2010 to 2019:
+```{r, message=FALSE,warning=FALSE, out.width="50%"}
+
+indz <- c()
+for (var in 1:10) {
+ indz <- c(indz, which(mortality_data == as.character(surface_water_countries[var,"Country"])))
+}
+mortality_surface <- as.data.frame(mortality_data[indz,]) # must be a data frame to avoid errors when plotting
+
+data_surf_m <- melt(mortality_surface,id=c("Country Name","Country Code"))
+
+colnames(data_surf_m) <- c("Country_Name","Country_Code","Year","Value")
+data_surf_m <- select(data_surf_m,-c(2))
+
+p6 <- ggplot(data=data_surf_m,aes(x=Year,y=Value,group=Country_Name,color=Country_Name))+
+  geom_line()+labs(colour = "Country Name") + ylab("Mortality Rate per 1000")+ theme_classic()
+p6
+
+indy <- c()
+for (var in 1:10) {
+ indy <- c(indy, which(mortality_data == as.character(safely_countries[var,"Country"])))
+}
+mortality_safely <- as.data.frame(mortality_data[indy,]) # must be a data frame to avoid errors when plotting
+
+data_safely_m <- melt(mortality_safely,id=c("Country Name","Country Code"))
+
+colnames(data_safely_m) <- c("Country_Name","Country_Code","Year","Value")
+data_safely_m <- select(data_safely_m,-c(2))
+
+p7 <- ggplot(data=data_safely_m,aes(x=Year,y=Value,group=Country_Name,color=Country_Name))+
+  geom_line()+labs(colour = "Country Name") + ylab("Mortality Rate per 1000")+ theme_classic()+labs(title="")
+p7
+
+```
+                           
+# Conclusion and Results
+The aim of the project was to show the status of countries in the world with access to clean water, and in this respect, it was desired to question why countries with poor conditions were in this situation.
+
+In order to answer this question, first of all, an analysis was made about the status and risks of some water resources in the world.
+Then, the GDP values of the countries were compared, as the most plausible correlation in terms of access to clean water was the economic situation. Data on mortality rates for countries were also compared, as death rates were considered an outcome.
+
+Looking at the graphs, it is seen that at least one out of every four people has problems in accessing drinking water and about 12 percent of those people do not even have a basic access to water which means they have to spend more than 30 minutes to drink or use clean water. This situation of some countries is compared with their economies. There is huge correlation with their economic status, they are economically backward countries that have no safe access to water. Looking at mortality rates, it was observed that countries where there is no access to clean water have much more deaths than others.
+
+Finally, the biggest problem facing our clean water resources is drought and poor quality water. It can be predicted that the biggest reasons for this are climate change and increasing population.
+
+# References
+- [Worldbank Website](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD)
+- [UNICEF Website](https://data.unicef.org/topic/water-and-sanitation/covid-19/)
+- [CDP Data Website](https://data.cdp.net/browse?category=Water)
+- [Worldbank Website for GDP](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD)
+- [Worldbank Website for Mortality](https://data.worldbank.org/indicator/SP.DYN.CDRT.IN)
+- [JMP Website](https://washdata.org/)
